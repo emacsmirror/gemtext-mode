@@ -589,11 +589,6 @@ Return t if a text has been fontified, nil otherwise."
   "Syntax highlighting for Gemtext files.")
 
 
-;;; Links =====================================================================
-
-(add-hook 'gemtext-mode-hook #'goto-address-mode)
-
-
 ;;; Unordered lists ===========================================================
 
 (defun gemtext-empty-line-at-pos-p ()
@@ -681,7 +676,7 @@ that might match `outline-regexp'."
     ;; Hide any false positives in preformatted text blocks
     (unless (outline-on-heading-p)
       (outline-next-visible-heading 1))
-    (while (< (point) (point-max))
+    (while (not (eobp))
       (when (gemtext-pre-text-at-pos (point))
         (outline-flag-region (1- (line-beginning-position)) (line-end-position) t))
       (outline-next-visible-heading 1))))
@@ -700,8 +695,6 @@ that might match `outline-regexp'."
   (if (gemtext-on-heading-p)
       (gemtext-heading-cycle)
     (indent-for-tab-command)))
-
-(add-hook 'gemtext-mode-hook #'outline-minor-mode)
 
 
 ;;; Keymap ====================================================================
@@ -722,10 +715,8 @@ that might match `outline-regexp'."
 ;;; Mode definition ===========================================================
 
 ;;;###autoload
-(define-derived-mode gemtext-mode text-mode "gemtext"
+(define-derived-mode gemtext-mode text-mode "Gemtext"
   "Major mode for Gemtext-formatted text."
-  (setq mode-name "Gemtext")
-
   ;; Syntax analysis
   (add-hook 'syntax-propertize-extend-region-functions
             #'gemtext-syntax-propertize-extend-region nil t)
@@ -740,8 +731,12 @@ that might match `outline-regexp'."
                              (font-lock-multiline . t)))
 
   ;; Outline mode
+  (outline-minor-mode)
   (setq-local outline-regexp gemtext-regexp-heading)
   (setq-local outline-level #'gemtext-outline-level)
+
+  ;; Links
+  (goto-address-mode)
   
   ;; Hook
   (run-hooks 'gemtext-mode-hook))
