@@ -97,7 +97,7 @@ Group 1 matches the angle bracket.
 Group 2 matches the quoted text.")
 
 (defconst gemtext-regexp-link
-  "^\\(?1:=>\\) +\\(?2:\\([a-zA-Z0-9+-./:?@]+\\)\\)\\( +\\(?3:.*\\)\\)?$"
+  "^\\(?1:=>\\)[[:blank:]]?\\(?2:[^[:blank:]\n]+\\)\\(?3:[[:blank:]]?.*\\)?$"
   "Regular expression for matching links.
 Group 1 matches the markup.
 Group 2 matches the URL.
