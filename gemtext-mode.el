@@ -444,6 +444,11 @@ Should be displayed with this face: >, =>, ```, #, ##, ###."
   "Face for Gemtext links labels."
   :group 'gemtext-faces)
 
+(defface gemtext-face-highlight-link
+  '((t :inherit highlight))
+  "Face for Gemtext highlighted links."
+  :group 'gemtext-faces)
+
 (defface gemtext-face-pre-alt
   '((t :inherit (italic)))
   "Face for Gemtext preformatted text blocks alternative text."
@@ -545,6 +550,12 @@ Return t if a link has been fontified, nil otherwise."
     ;; Face for the label
     (font-lock-append-text-property (match-beginning 3) (match-end 3)
                                     'face 'gemtext-face-link-label)
+    ;; Face when mouse is on the line
+    (font-lock-append-text-property (match-beginning 1) (match-end 3)
+                                    'mouse-face 'gemtext-face-highlight-link)
+    (add-text-properties (match-beginning 1) (match-end 3)
+                         (list 'keymap gemtext-mode-mouse-map
+                               'help-echo "mouse-2: browse URL"))
     t))
 
 (defun gemtext-fontify-pre-fence-begin (last)
@@ -697,6 +708,36 @@ that might match `outline-regexp'."
     (indent-for-tab-command)))
 
 
+;;; URLs ======================================================================
+
+(defun gemtext-on-link-p ()
+  "Return non-nil if point is on a link."
+  (get-text-property (point) 'gemtext-link))
+
+(defun gemtext-link-url ()
+  "Return the URL part of the link at point."
+  (if (gemtext-on-link-p)
+      (let ((link-content (buffer-substring (line-beginning-position) (line-end-position))))
+        (string-match gemtext-regexp-link link-content)
+        (message (match-string 2 link-content)))
+    (user-error "Point is not at a link")))
+
+(defun gemtext-browse-url (url)
+  "Open URL."
+  (let* ((struct (url-generic-parse-url url))
+         (full (url-fullness struct)))
+    (if full
+        (browse-url url)
+      (find-file url))))
+
+(defun gemtext-follow-link-at-point (&optional event)
+  "Follow the link at point or EVENT."
+  (interactive (list last-command-event))
+  (if event
+      (posn-set-point (event-start event)))
+  (gemtext-browse-url (gemtext-link-url)))
+
+
 ;;; Keymap ====================================================================
 
 (defvar gemtext-mode-map
@@ -710,6 +751,13 @@ that might match `outline-regexp'."
     ;; ---
     map)
   "Keymap for `gemtext-mode'.")
+
+(defvar gemtext-mode-mouse-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [follow-link] 'mouse-face)
+    (define-key map [mouse-2] #'gemtext-follow-link-at-point)
+    map)
+  "Keymap for following links with mouse.")
 
 
 ;;; Mode definition ===========================================================
@@ -735,9 +783,6 @@ that might match `outline-regexp'."
   (setq-local outline-regexp gemtext-regexp-heading)
   (setq-local outline-level #'gemtext-outline-level)
 
-  ;; Links
-  (goto-address-mode)
-  
   ;; Hook
   (run-hooks 'gemtext-mode-hook))
 
