@@ -760,6 +760,32 @@ that might match `outline-regexp'."
   "Keymap for following links with mouse.")
 
 
+;;; Yank Media ================================================================
+
+(defun gemtext-mode--yank-media-handler (mimetype data)
+  "Save DATA of mime-type MIMETYPE and insert a Gemtext link at point.
+Meant to be used as a media handler."
+  (let* ((assets-root (concat default-directory "assets/"))
+         (asset-file (read-file-name (format "Save %s asset to file: " mimetype) assets-root))
+         (hint (read-string "Description: " nil)))
+    (when (and (not (file-directory-p assets-root))
+               (yes-or-no-p "An asset directory does not yet exist under this folder.  Create it?"))
+      (make-directory assets-root))
+    (when (file-directory-p asset-file)
+      (user-error "%s is a directory"))
+    (when (and (file-exists-p asset-file)
+               (not (yes-or-no-p (format "%s already exists.  Overwrite?" asset-file))))
+      (user-error "Overwrite aborted!"))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (insert data)
+      (write-region (point-min) (point-max) asset-file))
+    (unless (gemtext-empty-line-at-pos-p)
+      (end-of-line)
+      (insert "\n"))
+    (insert (format "=> %s %s\n" (file-relative-name asset-file) hint))))
+
+
 ;;; Mode definition ===========================================================
 
 ;;;###autoload
@@ -782,6 +808,10 @@ that might match `outline-regexp'."
   (outline-minor-mode)
   (setq-local outline-regexp gemtext-regexp-heading)
   (setq-local outline-level #'gemtext-outline-level)
+
+  ;; Yank media handler
+  (when (fboundp 'yank-media-handler)
+    (yank-media-handler ".*/.*" #'gemtext-mode--yank-media-handler))
 
   ;; Hook
   (run-hooks 'gemtext-mode-hook))
