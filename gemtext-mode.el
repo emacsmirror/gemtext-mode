@@ -664,6 +664,100 @@ Do not move the cursor if there is no such block."
                                             block-end-position))
     (forward-line)))
 
+(defun gemtext--header-data (header)
+  "Test if the HEADER is correctly formatted."
+  (if-let* ((sep (string-match "|" header))
+            (mode (string-trim (substring header 0 sep)))
+            (len  (length header))
+            (name (string-trim (substring header (+ sep 1) len))))
+      (cons mode name)
+    nil))
+
+(defun gemtext--list-major-modes ()
+  "List all currently defined major modes."
+  (let (modes)
+    (mapatoms
+     (lambda (sym)
+       (when (and (fboundp sym)
+                  (string-match "-mode$" (symbol-name sym)))
+         (push sym modes))))
+    (nreverse modes)))
+
+(defun gemtext--expand-major-mode (string)
+  "Expand the major mode STRING to match its corresponding major mode function.
+This tries to find the mode two ways: first it looks for a match in `auto-mode-alist'.  If it finds a match, it uses that.  Otherwise, it inspects the list of major modes if there is a match, it returns that function. Otherwise, it returns `fundamental-mode'."
+  (if-let ((match (assoc (concat "." string) auto-mode-alist #'string-match-p)))
+      (cdr match)
+    (let ((modes (mapcar #'symbol-name (gemtext--list-major-modes))))
+      (if (member string modes)
+          (intern string)
+        #'fundamental-mode))))
+
+(defun gemtext--get-major-mode (header)
+  "Extract the major mode from the buffer specification string in HEADER."
+  (if-let ((hd (gemtext--header-data header)))
+      (gemtext--expand-major-mode (car hd))
+    nil))
+
+(defun gemtext--make-name-unique (title)
+  "Generate a unique name for the buffer based on the TITLE given in the pre-block header."
+  (generate-new-buffer-name title))
+
+(defun gemtext--get-buffer-name (header)
+  "Extract the buffer name from the buffer specification string in HEADER."
+  (if-let ((hd (gemtext--header-data header)))
+      (gemtext--make-name-unique (cdr hd))
+    nil))
+
+(defun gemtext-widen-region ()
+  "Widen the region and restore `gemtext-mode'."
+  (interactive)
+  (when (buffer-narrowed-p)
+    (local-unset-key (kbd "C-c C-c"))
+    (widen)
+    (gemtext-mode)))
+
+(defun gemtext--extract-header (block-region)
+  "Extract the header from the BLOCK-REGION."
+  (save-excursion
+    (let ((start (car block-region))
+          (end   (cadr block-region)))
+      (goto-char start)
+      (previous-line 1)
+      (beginning-of-line)
+      (search-forward "```")
+      (buffer-substring-no-properties (point) (line-end-position)))))
+
+
+(defun gemtext-narrow-to-pre-block ()
+  "Edit the preformatted text as if it was in it's own file.
+To use, place the cursor is inside a preformatted block.  Then
+call this command.  It will narrow the region to the body of the
+current preformatted block.  If the point is not inside a
+preformatted block, then the function will give a message
+indicating that and then exit.  Upon narrowing the buffer it will
+attempt to change the major mode intelligently based on the text
+on the line following the three backticks, from which it will
+attempt to identify an extension which it will compare to
+`auto-mode-alist'.  To exit, call `gemtext-widen-region'."
+  (interactive)
+  (if (get-text-property (line-beginning-position) 'gemtext-pre-fence-begin)
+      (next-line))
+  (if-let* ((x (point))
+            (be (gemtext-pre-block-at-pos-p x)))
+      (progn
+        (if-let* ((h (gemtext--extract-header be))
+                  (m (gemtext--get-major-mode h))
+                  (b (gemtext--get-buffer-name h)))
+            (progn
+              (let ((beg (car be))
+                    (end (cadr be)))
+                (narrow-to-region beg end)
+                (funcall m)
+                (local-set-key (kbd "C-c C-c") #'gemtext-widen-region)))
+          (user-error "Malformed header!")))
+    (user-error "Not inside a pre-block!")))
+
 
 ;;; Folding ===================================================================
 
@@ -748,6 +842,7 @@ that might match `outline-regexp'."
     (define-key map (kbd "M-RET") 'gemtext-insert-ulist-item)
     ;; Preformatted text blocks editing
     (define-key map (kbd "C-c C-p") 'gemtext-insert-pre-block)
+    (define-key map (kbd "C-c C-c") #'gemtext-narrow-to-pre-block)
     ;; ---
     map)
   "Keymap for `gemtext-mode'.")
