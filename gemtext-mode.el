@@ -817,7 +817,8 @@ Meant to be used as a media handler."
                              ;; Syntax-alist
                              nil
                              ;; Rest
-                             (font-lock-multiline . t)))
+                             (font-lock-multiline . t)
+                             (font-lock-extra-managed-props . (help-echo mouse-face keymap))))
 
   ;; Outline mode
   (outline-minor-mode)
