@@ -1,7 +1,6 @@
 ;;; gemtext-mode.el --- Major mode for Gemtext-formatted text -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2023 Antoine Aubé
-
+;; Copyright (C) 2023-2024 Antoine Aubé
 
 ;; Author: Antoine Aubé <courriel@arjca.fr>
 ;; Created: 28 Oct 2023
@@ -66,24 +65,6 @@
 Group 1 matches the markup.
 Group 2 matches the title.")
 
-(defconst gemtext-regexp-heading1
-  "^\\(?1:#\\)[[:blank:]]+\\(?2:.*\\)$"
-  "Regular expression for matching heading #1.
-Group 1 matches the markup.
-Group 2 matches the title.")
-
-(defconst gemtext-regexp-heading2
-  "^\\(?1:##\\)[[:blank:]]+\\(?2:.*\\)$"
-  "Regular expression for matching heading #2.
-Group 1 matches the markup.
-Group 2 matches the title.")
-
-(defconst gemtext-regexp-heading3
-  "^\\(?1:###\\)[[:blank:]]+\\(?2:.*\\)$"
-  "Regular expression for matching heading #3.
-Group 1 matches the markup.
-Group 2 matches the title.")
-
 (defconst gemtext-regexp-ulist-item
   "^\\(?1:*\\)[[:blank:]]+\\(?2:.*\\)$"
   "Regular expression for matching unordered list items.
@@ -119,9 +100,6 @@ Group 3 matches the optional label.")
         'gemtext-pre-fence-end nil
         'gemtext-pre-text nil
         'gemtext-heading nil
-        'gemtext-heading1 nil
-        'gemtext-heading2 nil
-        'gemtext-heading3 nil
         'gemtext-ulist nil
         'gemtext-blockquote nil
         'gemtext-link nil)
@@ -150,26 +128,11 @@ The added properties are PROPERTIES."
                            prop
                            (match-data t))))))
 
-(defun gemtext-syntax-propertize-headings1 (start end)
-  "Propertize heading of level 1 from START to END."
+(defun gemtext-syntax-propertize-headings (start end)
+  "Propertize heading from START to END."
   (gemtext-syntax-propertize-markup-on-single-line start end
-                                                   gemtext-regexp-heading1
-                                                   (list 'gemtext-heading1
-                                                         'gemtext-heading)))
-
-(defun gemtext-syntax-propertize-headings2 (start end)
-  "Propertize heading of level 2 from START to END."
-  (gemtext-syntax-propertize-markup-on-single-line start end
-                                                   gemtext-regexp-heading2
-                                                   (list 'gemtext-heading2
-                                                         'gemtext-heading)))
-
-(defun gemtext-syntax-propertize-headings3 (start end)
-  "Propertize heading of level 3 from START to END."
-  (gemtext-syntax-propertize-markup-on-single-line start end
-                                                   gemtext-regexp-heading3
-                                                   (list 'gemtext-heading3
-                                                         'gemtext-heading)))
+                                                   gemtext-regexp-heading
+                                                   (list 'gemtext-heading)))
 
 (defun gemtext-syntax-propertize-ulists (start end)
   "Propertize unordered list items from START to END."
@@ -288,9 +251,7 @@ START and END delimit region to propertize."
     (save-excursion
       (remove-text-properties start end gemtext--syntax-properties)
       (gemtext-syntax-propertize-pre-blocks start end)
-      (gemtext-syntax-propertize-headings1 start end)
-      (gemtext-syntax-propertize-headings2 start end)
-      (gemtext-syntax-propertize-headings3 start end)
+      (gemtext-syntax-propertize-headings start end)
       (gemtext-syntax-propertize-ulists start end)
       (gemtext-syntax-propertize-blockquotes start end)
       (gemtext-syntax-propertize-links start end))))
@@ -346,23 +307,11 @@ Restore match data previously stored in PROPERTY."
                                (point)))
                       (point-max))))))
 
-(defun gemtext-match-headings1 (last)
-  "Match headings of level 1 from point to LAST.
-Use data stored in \\='gemtext-heading1 text property during syntax
+(defun gemtext-match-headings (last)
+  "Match headings from point to LAST.
+Use data stored in \\='gemtext-heading text property during syntax
 propertization."
-  (gemtext-match-propertized-text 'gemtext-heading1 last))
-
-(defun gemtext-match-headings2 (last)
-  "Match headings of level 2 from point to LAST.
-Use data stored in \\='gemtext-heading2 text property during syntax
-propertization."
-  (gemtext-match-propertized-text 'gemtext-heading2 last))
-
-(defun gemtext-match-headings3 (last)
-  "Match headings of level 3 from point to LAST.
-Use data stored in \\='gemtext-heading3 text property during syntax
-propertization."
-  (gemtext-match-propertized-text 'gemtext-heading3 last))
+  (gemtext-match-propertized-text 'gemtext-heading last))
 
 (defun gemtext-match-ulist-items (last)
   "Match unordered list items from point to LAST.
@@ -414,19 +363,9 @@ propertization."
 Should be displayed with this face: >, =>, ```, #, ##, ###."
   :group 'gemtext-faces)
 
-(defface gemtext-face-heading1
-  '((t :inherit font-lock-function-name-face :weight bold :height 2.0))
-  "Face for Gemtext headings #1."
-  :group 'gemtext-faces)
-
-(defface gemtext-face-heading2
-  '((t :inherit font-lock-function-name-face :weight bold :height 1.6))
-  "Face for Gemtext headings #2."
-  :group 'gemtext-faces)
-
-(defface gemtext-face-heading3
-  '((t :inherit font-lock-function-name-face :weight bold :height 1.3))
-  "Face for Gemtext headings #3."
+(defface gemtext-face-heading
+  '((t :inherit font-lock-function-name-face :weight bold))
+  "Face for Gemtext headings."
   :group 'gemtext-faces)
 
 (defface gemtext-face-blockquote-quote
@@ -480,40 +419,16 @@ START and END are the previous region to refontify."
       (setq jit-lock-start (car res)
             jit-lock-end (cdr res)))))
 
-(defun gemtext-fontify-headings1 (last)
-  "Apply font-lock properties to headings of level 1 from point to LAST.
+(defun gemtext-fontify-headings (last)
+  "Apply font-lock properties to headings from point to LAST.
 Return t if a heading has been fontified, nil otherwise."
-  (when (gemtext-match-headings1 last)
+  (when (gemtext-match-headings last)
     ;; Face for "#"
     (add-text-properties (match-beginning 1) (match-end 1)
                          `(face gemtext-face-markup))
     ;; Face for the heading content
     (font-lock-append-text-property (match-beginning 2) (match-end 2)
-                                    'face 'gemtext-face-heading1)
-    t))
-
-(defun gemtext-fontify-headings2 (last)
-  "Apply font-lock properties to headings of level 2 from point to LAST.
-Return t if a heading has been fontified, nil otherwise."
-  (when (gemtext-match-headings2 last)
-    ;; Face for "##"
-    (add-text-properties (match-beginning 1) (match-end 1)
-                         `(face gemtext-face-markup))
-    ;; Face for the quoted content
-    (font-lock-append-text-property (match-beginning 2) (match-end 2)
-                                    'face 'gemtext-face-heading2)
-    t))
-
-(defun gemtext-fontify-headings3 (last)
-  "Apply font-lock properties to headings of level 3 from point to LAST.
-Return t if a heading has been fontified, nil otherwise."
-  (when (gemtext-match-headings3 last)
-    ;; Face for "###"
-    (add-text-properties (match-beginning 1) (match-end 1)
-                         `(face gemtext-face-markup))
-    ;; Face for the quoted content
-    (font-lock-append-text-property (match-beginning 2) (match-end 2)
-                                    'face 'gemtext-face-heading3)
+                                    'face 'gemtext-face-heading)
     t))
 
 (defun gemtext-fontify-ulist-items (last)
@@ -588,9 +503,7 @@ Return t if a text has been fontified, nil otherwise."
     t))
 
 (defvar gemtext-mode-font-lock-keywords
-  `((gemtext-fontify-headings1)
-    (gemtext-fontify-headings2)
-    (gemtext-fontify-headings3)
+  `((gemtext-fontify-headings)
     (gemtext-fontify-ulist-items)
     (gemtext-fontify-blockquotes)
     (gemtext-fontify-links)
