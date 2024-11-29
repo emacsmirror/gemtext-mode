@@ -594,10 +594,10 @@ attempt to identify an extension which it will compare to
       (next-line))
   (if-let* ((x (point))
             (be (gemtext-pre-block-at-pos-p x)))
-      (progn
-        (if-let* ((h (gemtext-extract-header be))
-                  (m (gemtext-get-major-mode h))
-                  (b (gemtext-get-buffer-name h)))
+      (let* ((header-line (gemtext-extract-header be))
+             (header-data (gemtext-header-data header-line)))
+        (if-let ((m (gemtext-get-major-mode header-data))
+                 (b (gemtext-get-buffer-name header-data)))
             (progn
               (let ((beg (car be))
                     (end (cadr be)))
@@ -619,10 +619,11 @@ attempt to identify an extension which it will compare to
       (buffer-substring-no-properties (point) (line-end-position)))))
 
 (defun gemtext-get-major-mode (header)
-  "Extract the major mode from the buffer specification string in HEADER."
-  (if-let ((hd (gemtext-header-data header)))
-      (gemtext-expand-major-mode (car hd))
-    nil))
+  "Extract the major mode from the buffer specification string in HEADER.
+Defaults to fundamental mode when HEADER is nil."
+  (if header
+      (gemtext-expand-major-mode (car header))
+    #'fundamental-mode))
 
 (defun gemtext-header-data (header)
   "Test if the HEADER is correctly formatted."
@@ -655,13 +656,22 @@ This tries to find the mode two ways: first it looks for a match in `auto-mode-a
 
 (defun gemtext-get-buffer-name (header)
   "Extract the buffer name from the buffer specification string in HEADER."
-  (if-let ((hd (gemtext-header-data header)))
-      (gemtext-make-name-unique (cdr hd))
-    nil))
+  (if header
+      (gemtext-make-name-unique (cdr header))
+    (concat "narrowed pre block-" (gemtext-random-alnum 5))))
 
 (defun gemtext-make-name-unique (title)
   "Generate a unique name for the buffer based on the TITLE given in the pre-block header."
   (generate-new-buffer-name title))
+
+(defun gemtext-random-alnum (size)
+  "Generate a random string of given SIZE with only lowercase letter and numbers."
+  (if (< size 1)
+      ""
+    (let* ((alnum "abcdefghijklmnopqrstuvwxyz0123456789")
+           (i (% (abs (random)) (length alnum)))
+           (random-char (substring alnum i (1+ i))))
+      (concat random-char (gemtext-random-alnum (1- size))))))
 
 (defun gemtext-widen-region ()
   "Widen the region and restore `gemtext-mode'."
